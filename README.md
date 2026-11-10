@@ -231,4 +231,18 @@ getting file \user.txt of size 32 as user.txt (0.0 KiloBytes/sec) (average 0.2 K
 smb: \> ^C
 ````
 Inside Notes we find the user.txt and a ToDo list:
+````
+cat ToDo.txt  
+Thomas,
 
+after convincing the finance department to get rid of their ancienct banking software
+it is finally time to clean up the mess they made. We should start with the pre created
+computer account. That one is older than me.
+
+Best
+
+James                  
+````
+
+The key here is "older than me". It's clear that they are talking about the BANKING$ acc, and "older than me" makes me think of pre-windows 2000 computers. There is a great article about that here: https://trustedsec.com/blog/diving-into-pre-created-computer-accounts.
+The way to go here is to change de BANKING$ acc password
