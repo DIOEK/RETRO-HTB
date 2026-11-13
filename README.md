@@ -258,9 +258,9 @@ retro.vl\BANKING$:banking STATUS_NOLOGON_WORKSTATION_TRUST_ACCOUNT
 ````
 
 The changepasswd script from impacket can change de password of the BANKING$ account:
-````
+
 <img width="1232" height="105" alt="image" src="https://github.com/user-attachments/assets/726e6c83-fb1b-4c78-93e4-e0687f1118f1" />
-````
+
 
 Now the password for BANKING$ should be 'password'. Let's check it:
 
@@ -406,7 +406,6 @@ File 'administrator.pfx' already exists. Overwrite? (y/n - saying no will save w
 ````
 
 Now we use the certificate and private key saved at administrator.pfx to retrieve the RC4 hash of the Administrator user:
-````
 
 
 
